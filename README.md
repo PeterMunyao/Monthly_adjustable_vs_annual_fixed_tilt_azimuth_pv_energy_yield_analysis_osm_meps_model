@@ -1,4 +1,4 @@
-# Solar Panel Optimization Analysis
+# Monthly versus Annual Optimal Tilt-Azimuth: PV Array Energy Yield Analysis Using the OSM-MEPS Model
 
 ## Project Overview
 
