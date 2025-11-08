@@ -12,7 +12,7 @@ This Python-based solar energy analysis tool performs comprehensive optimization
 - **Performance Comparison**: Quantifies energy gains from monthly adjustments vs fixed positioning
 
 
-## Technical Implementation
+## Implementation
 
 ### Core Components
 
