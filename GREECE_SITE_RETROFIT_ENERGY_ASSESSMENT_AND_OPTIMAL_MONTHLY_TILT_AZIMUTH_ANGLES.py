@@ -992,3 +992,239 @@ create_compass_loop_plot()
 
 #-------------------------------------------------------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------------------------------------------------------
+
+import matplotlib.pyplot as plt
+import numpy as np
+
+# === PLOTTING CODE: Compass-Loop Oriented Tilt–Azimuth (E=Baseline) ===
+
+# Set global style parameters for professional aesthetic
+plt.rcParams['font.family'] = 'serif'
+plt.rcParams['font.serif'] = ['Garamond']
+plt.rcParams['font.size'] = 20  # Increased by 3 steps (from 17)
+plt.rcParams['axes.linewidth'] = 1.2
+plt.rcParams['lines.linewidth'] = 2.5
+plt.rcParams['lines.markersize'] = 10
+plt.rcParams['axes.facecolor'] = '#fafafa'
+plt.rcParams['figure.facecolor'] = '#fafafa'
+plt.rcParams['font.weight'] = 'bold'  # Make all text bold
+
+def normalize_azimuth(az):
+    """Normalize to 0–360"""
+    return az % 360
+
+def compass_transform_e_baseline(az):
+    """
+    Transform azimuth so that:
+    - E (90°) is at baseline (x-axis level)
+    - W (270°) is at both top and bottom extremes
+    - Circular compass layout
+    """
+    az = normalize_azimuth(az)
+    # Transform to have 90° (E) at 0, 270° (W) at ±180
+    transformed = (az - 90) % 360
+    if transformed > 180:
+        transformed = transformed - 360
+    return transformed
+
+def create_compass_loop_plot():
+    """Create combined monthly tilt-azimuth plot with E=baseline orientation"""
+    
+    fig, ax1 = plt.subplots(figsize=(10, 7))  # Changed to length 10, height 6
+    ax1.set_facecolor('#fafafa')
+
+    months_available = [m for m in months if m in monthly_results_pvlib]
+    month_labels = [month_names[m - 1] for m in months_available]
+
+    # === Extract Data ===
+    pvlib_tilt = [monthly_results_pvlib[m]['optimal_tilt'] for m in months_available]
+    osm_tilt = [monthly_results_osmmeps[m]['optimal_tilt'] for m in months_available]
+    pvlib_az = [compass_transform_e_baseline(monthly_results_pvlib[m]['optimal_azimuth']) for m in months_available]
+    osm_az = [compass_transform_e_baseline(monthly_results_osmmeps[m]['optimal_azimuth']) for m in months_available]
+
+    print("PVLIB Transformed Azimuth values:", pvlib_az)
+    print("OSM Transformed Azimuth values:", osm_az)
+    print("PVLIB Tilt values:", pvlib_tilt)
+    print("OSM Tilt values:", osm_tilt)
+
+    # === Twin Axis for Tilt ===
+    ax2 = ax1.twinx()
+    ax2.set_facecolor('#fafafa')
+
+    # === Colors ===
+    color_pvlib_tilt = 'orange'
+    color_osm_tilt = 'green'
+    color_pvlib_azimuth = 'maroon'
+    color_osm_azimuth = 'cyan'
+
+    # === ENHANCED GRID LINES - ADDED FIRST ===
+    
+    # Major grid lines for azimuth (every 45 degrees)
+    az_major_ticks = np.arange(-180, 181, 45)
+    for tick in az_major_ticks:
+        ax1.axhline(y=tick, color='lightgray', linewidth=0.8, linestyle='-', alpha=0.55)
+    
+    # Minor grid lines for azimuth (every 15 degrees)  
+    az_minor_ticks = np.arange(-180, 181, 15)
+    for tick in az_minor_ticks:
+        if tick not in az_major_ticks:  # Avoid duplicating major grid lines
+            ax1.axhline(y=tick, color='lightgray', linewidth=0.5, linestyle='--', alpha=0.45)
+    
+    # Major grid lines for tilt (every 15 degrees)
+    tilt_major_ticks = np.arange(0, 91, 15)
+    for tick in tilt_major_ticks:
+        ax2.axhline(y=tick, color='lightblue', linewidth=0.6, linestyle='-', alpha=0.55)
+    
+    # Minor grid lines for tilt (every 5 degrees)
+    tilt_minor_ticks = np.arange(0, 91, 5)
+    for tick in tilt_minor_ticks:
+        if tick not in tilt_major_ticks:  # Avoid duplicating major grid lines
+            ax2.axhline(y=tick, color='lightblue', linewidth=0.5, linestyle='--', alpha=0.45)
+    
+    # Vertical grid lines for months
+    for i in range(len(month_labels)):
+        ax1.axvline(x=i, color='lightgray', linewidth=0.5, linestyle='-', alpha=0.65)
+
+    # === Plot AZIMUTH ===
+    line3 = ax1.plot(month_labels, pvlib_az, 'o--', color=color_pvlib_azimuth,
+             markerfacecolor=color_pvlib_azimuth, markeredgecolor='white',
+             markeredgewidth=2, linewidth=3.2, markersize=12,
+             label='PVLIB Optimal Azimuth')
+
+    line4 = ax1.plot(month_labels, osm_az, 's--', color=color_osm_azimuth,
+             markerfacecolor=color_osm_azimuth, markeredgecolor='white',
+             markeredgewidth=2, linewidth=3.2, markersize=10,
+             label='OSM-MEPS Optimal Azimuth')
+
+    # === Plot TILT ===
+    line1 = ax2.plot(month_labels, pvlib_tilt, 'o-', color=color_pvlib_tilt,
+             markerfacecolor=color_pvlib_tilt, markeredgecolor='white',
+             markeredgewidth=2, linewidth=3.2, markersize=12,
+             label='PVLIB Optimal Tilt')
+
+    line2 = ax2.plot(month_labels, osm_tilt, 's-', color=color_osm_tilt,
+             markerfacecolor=color_osm_tilt, markeredgecolor='white',
+             markeredgewidth=2, linewidth=3.2, markersize=10,
+             label='OSM-MEPS Optimal Tilt')
+
+    # === Axis Setup - E (90°) as Baseline ===
+    ax1.set_ylim(-180, 180)  # W (270°) at both top and bottom
+    ax1.axhline(0, color='black', linewidth=1, linestyle=':', alpha=0.7)  # E (90°) baseline
+    
+    ax1.set_ylabel('Optimal Azimuth Angle (°)', fontsize=21, fontfamily='Garamond', fontweight='bold', color='black')  # Increased font size
+
+    # Ticks every 45 degrees with compass points
+    az_ticks = np.arange(-180, 181, 45)
+    az_labels = []
+    for t in az_ticks:
+        # Convert back to original azimuth for labeling
+        orig_az = (t + 90) % 360
+        if orig_az == 90:
+            label = 'E\n90°'
+        elif orig_az == 0:
+            label = 'N\n0°'
+        elif orig_az == 180:
+            label = 'S\n180°'
+        elif orig_az == 270:
+            label = 'W\n270°'
+        elif orig_az == 45:
+            label = '45°'
+        elif orig_az == 135:
+            label = '135°'
+        elif orig_az == 225:
+            label = '225°'
+        elif orig_az == 315:
+            label = '315°'
+        else:
+            label = f'{orig_az}°'
+        az_labels.append(label)
+
+    ax1.set_yticks(az_ticks)
+    ax1.set_yticklabels(az_labels)
+    ax1.tick_params(axis='y', labelsize=17, labelcolor='black')  # Increased font size
+
+    # === Tilt Axis ===
+    ax2.set_ylim(0, 90)
+    ax2.set_ylabel('Optimal Tilt Angle (°)', fontsize=21, fontfamily='Garamond', fontweight='bold', color='black')  # Increased font size
+    ax2.tick_params(axis='y', labelsize=19, labelcolor='black')  # Increased font size
+    ax2.set_yticks(np.arange(0, 91, 15))  # Set major ticks for tilt
+
+    # === X-axis Configuration ===
+    ax1.set_xlabel('Month', fontsize=21, fontfamily='Garamond', fontweight='bold')  # Increased font size
+    ax1.set_xlim(-0.5, len(month_labels)-0.5)
+    ax1.tick_params(axis='x', labelsize=19)  # Increased font size
+
+    # === Annotations ===
+    
+    # Annotate Azimuth points (ax1)
+    for i, (azimuth_pvlib, azimuth_osm) in enumerate(zip(pvlib_az, osm_az)):
+        # Get original azimuth values for display
+        pvlib_az_orig = normalize_azimuth(monthly_results_pvlib[months_available[i]]['optimal_azimuth'])
+        osm_az_orig = normalize_azimuth(monthly_results_osmmeps[months_available[i]]['optimal_azimuth'])
+        
+        # Dynamic positioning based on transformed values
+        if azimuth_pvlib > 0:
+            pvlib_voffset = 24
+            pvlib_va = 'bottom'
+        else:
+            pvlib_voffset = -5
+            pvlib_va = 'top'
+            
+        if azimuth_osm > 0:
+            osm_voffset = -5
+            osm_va = 'bottom'
+        else:
+            osm_voffset = -7
+            osm_va = 'bottom'
+        
+        ax1.annotate(f'{pvlib_az_orig:.0f}°', (i, azimuth_pvlib), 
+                     xytext=(0, pvlib_voffset), textcoords="offset points", 
+                     ha='center', fontsize=14, fontfamily='Garamond', fontweight='bold',  # Increased font size
+                     bbox=dict(boxstyle="round,pad=0.12", facecolor='lightcoral', alpha=0.8, edgecolor=color_pvlib_azimuth))
+        
+        ax1.annotate(f'{osm_az_orig:.0f}°', (i, azimuth_osm), 
+                     xytext=(0, osm_voffset), textcoords="offset points", 
+                     ha='center', fontsize=14, fontfamily='Garamond', fontweight='bold',  # Increased font size
+                     bbox=dict(boxstyle="round,pad=0.12", facecolor='lightcyan', alpha=0.8, edgecolor=color_osm_azimuth))
+
+    # Annotate Tilt points (ax2)
+    for i, (tilt_pvlib, tilt_osm) in enumerate(zip(pvlib_tilt, osm_tilt)):
+        # Simple vertical positioning for tilt
+        if tilt_pvlib > tilt_osm:
+            pvlib_voffset = -2
+            osm_voffset = -2
+        else:
+            pvlib_voffset = -10
+            osm_voffset = 15
+        
+        ax2.annotate(f'{tilt_pvlib:.0f}°', (i, tilt_pvlib), 
+                     xytext=(-8, pvlib_voffset), textcoords="offset points", 
+                     ha='center', fontsize=14, fontfamily='Garamond', fontweight='bold',  # Increased font size
+                     bbox=dict(boxstyle="round,pad=0.12", facecolor='lightblue', alpha=0.8, edgecolor=color_pvlib_tilt))
+        
+        ax2.annotate(f'{tilt_osm:.0f}°', (i, tilt_osm), 
+                     xytext=(8, osm_voffset), textcoords="offset points", 
+                     ha='center', fontsize=14, fontfamily='Garamond', fontweight='bold',  # Increased font size
+                     bbox=dict(boxstyle="round,pad=0.12", facecolor='lightgreen', alpha=0.8, edgecolor=color_osm_tilt))
+
+    # === Legend ===
+    lines = line1 + line2 + line3 + line4
+    labels = [l.get_label() for l in lines]
+    
+    ax1.legend(lines, labels, 
+               loc='upper center', bbox_to_anchor=(0.5, -0.15),
+               ncol=2, fontsize=16, framealpha=0.9,  # Increased font size
+               facecolor='white', edgecolor='gray')
+
+    # === Adjust layout and save ===
+    plt.tight_layout()
+    plt.subplots_adjust(bottom=0.18)
+    plt.savefig("GREECE_SERRES_C_TILT-AZIMUTH_PVLIB_OSM_MEPS_COMPASS_ELSEVIER_PETER.pdf", format="pdf", 
+                bbox_inches="tight", dpi=300, facecolor=fig.get_facecolor())
+    plt.show()
+
+# === Run the E=baseline plot ===
+create_compass_loop_plot()
+
+#------------------------------------------------------------------------------------------------------------------------
+#------------------------------------------------------------------------------------------------------------------------
