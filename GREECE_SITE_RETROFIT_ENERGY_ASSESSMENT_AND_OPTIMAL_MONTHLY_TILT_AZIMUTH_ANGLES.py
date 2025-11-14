@@ -1228,3 +1228,273 @@ create_compass_loop_plot()
 
 #------------------------------------------------------------------------------------------------------------------------
 #------------------------------------------------------------------------------------------------------------------------
+
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy import stats
+from matplotlib.gridspec import GridSpec
+import matplotlib.ticker as ticker
+
+# Set global style parameters for professional aesthetic
+plt.rcParams['font.family'] = 'serif'
+plt.rcParams['font.serif'] = ['Garamond']
+plt.rcParams['font.size'] = 20  # Increased by 3 steps (from 17)
+plt.rcParams['axes.linewidth'] = 1.2
+plt.rcParams['lines.linewidth'] = 2.5
+plt.rcParams['lines.markersize'] = 10
+plt.rcParams['axes.facecolor'] = '#fafafa'  # Changed to #fafafa
+plt.rcParams['figure.facecolor'] = '#fafafa'  # Changed to #fafafa
+plt.rcParams['font.weight'] = 'bold'  # Make all text bold
+
+def perform_statistical_analysis():
+    """Perform paired t-test analysis and create comparative plots"""
+    
+    # Extract data for analysis
+    months_available = [month for month in months if month in monthly_results_pvlib]
+    month_labels = [month_names[month-1] for month in months_available]
+    
+    # Prepare data arrays
+    monthly_opt_pvlib = [monthly_results_pvlib[month]['max_energy'] for month in months_available]
+    fixed_pvlib = [monthly_fixed_energy_pvlib[month] for month in months_available]
+    monthly_opt_osm = [monthly_results_osmmeps[month]['max_energy'] for month in months_available]
+    fixed_osm = [monthly_fixed_energy_osmmeps[month] for month in months_available]
+    
+    # Convert to numpy arrays
+    monthly_opt_pvlib = np.array(monthly_opt_pvlib)
+    fixed_pvlib = np.array(fixed_pvlib)
+    monthly_opt_osm = np.array(monthly_opt_osm)
+    fixed_osm = np.array(fixed_osm)
+    
+    # Calculate differences
+    differences_pvlib = monthly_opt_pvlib - fixed_pvlib
+    differences_osm = monthly_opt_osm - fixed_osm
+    
+    # VERIFICATION CALCULATIONS
+    print("=" * 60)
+    print("DATA VERIFICATION")
+    print("=" * 60)
+    print(f"Months analyzed: {len(months_available)}")
+    print(f"PVLib - Monthly optimal range: {monthly_opt_pvlib.min()/1000:.1f} to {monthly_opt_pvlib.max()/1000:.1f} MWh")
+    print(f"PVLib - Fixed optimal range: {fixed_pvlib.min()/1000:.1f} to {fixed_pvlib.max()/1000:.1f} MWh")
+    print(f"OSM-MEPS - Monthly optimal range: {monthly_opt_osm.min()/1000:.1f} to {monthly_opt_osm.max()/1000:.1f} MWh")
+    print(f"OSM-MEPS - Fixed optimal range: {fixed_osm.min()/1000:.1f} to {fixed_osm.max()/1000:.1f} MWh")
+    print(f"PVLib - Gain range: {differences_pvlib.min():.1f} to {differences_pvlib.max():.1f} kWh")
+    print(f"OSM-MEPS - Gain range: {differences_osm.min():.1f} to {differences_osm.max():.1f} kWh")
+    
+    # Perform paired t-tests
+    t_stat_pvlib, p_value_pvlib = stats.ttest_rel(monthly_opt_pvlib, fixed_pvlib)
+    t_stat_osm, p_value_osm = stats.ttest_rel(monthly_opt_osm, fixed_osm)
+    
+    # Print statistical results
+    print("\n" + "=" * 60)
+    print("PAIRED T-TEST ANALYSIS RESULTS")
+    print("=" * 60)
+    
+    print(f"\nPVLib Model:")
+    print(f"  t-statistic: {t_stat_pvlib:.4f}")
+    print(f"  p-value: {p_value_pvlib:.6f}")
+    print(f"  Mean monthly gain: {np.mean(differences_pvlib):.2f} kWh")
+    print(f"  Total annual gain: {np.sum(differences_pvlib):.2f} kWh")
+    
+    print(f"\nOSM-MEPS Model:")
+    print(f"  t-statistic: {t_stat_osm:.4f}")
+    print(f"  p-value: {p_value_osm:.6f}")
+    print(f"  Mean monthly gain: {np.mean(differences_osm):.2f} kWh")
+    print(f"  Total annual gain: {np.sum(differences_osm):.2f} kWh")
+    
+    # Statistical significance interpretation
+    alpha = 0.05
+    print(f"\nSTATISTICAL SIGNIFICANCE (alpha = {alpha}):")
+    
+    if p_value_pvlib < alpha:
+        print(f"  PVLib: SIGNIFICANT (p < {alpha})")
+    else:
+        print(f"  PVLib: NOT SIGNIFICANT (p ≥ {alpha})")
+    
+    if p_value_osm < alpha:
+        print(f"  OSM-MEPS: SIGNIFICANT (p < {alpha})")
+    else:
+        print(f"  OSM-MEPS: NOT SIGNIFICANT (p ≥ {alpha})")
+    
+    return monthly_opt_pvlib, fixed_pvlib, monthly_opt_osm, fixed_osm, differences_pvlib, differences_osm, month_labels
+
+def create_comparative_plots(monthly_opt_pvlib, fixed_pvlib, monthly_opt_osm, fixed_osm, differences_pvlib, differences_osm, month_labels):
+    """Create comparative plots - first in kWh, second (gains) in kWh"""
+    
+    # Convert only the first plot data to MWh
+    monthly_opt_pvlib_mwh = monthly_opt_pvlib 
+    fixed_pvlib_mwh = fixed_pvlib 
+    monthly_opt_osm_mwh = monthly_opt_osm 
+    fixed_osm_mwh = fixed_osm 
+    
+    # Keep gains in kWh for second plot
+    differences_pvlib_kwh = differences_pvlib
+    differences_osm_kwh = differences_osm
+    
+    # Create figure with two subplots
+    fig = plt.figure(figsize=(14, 15))
+    gs = GridSpec(2, 1, figure=fig, height_ratios=[1, 1], hspace=0.3)
+    
+    # Subplot 1: Monthly vs Fixed Energy Comparison - 4 BARS PER MONTH (kWh)
+    ax1 = fig.add_subplot(gs[0, 0])
+    ax1.set_facecolor('#fafafa')
+    
+    x_pos = np.arange(len(month_labels))
+    total_width = 0.8
+    bar_width = total_width / 4  # 4 bars per month
+    
+    # Calculate positions for 4 bars per month
+    positions = [
+        x_pos - 1.5*bar_width,  # PVLib Monthly Optimal
+        x_pos - 0.5*bar_width,  # PVLib Fixed Optimal  
+        x_pos + 0.5*bar_width,  # OSM-MEPS Monthly Optimal
+        x_pos + 1.5*bar_width   # OSM-MEPS Fixed Optimal
+    ]
+    
+    # Plot 4 bars per month in kWh
+    bars1 = ax1.bar(positions[0], monthly_opt_pvlib_mwh, bar_width,
+                   color='orange', alpha=0.9, edgecolor='darkorange', linewidth=1.5,  # Increased linewidth
+                   label='PVLIB Monthly Optimal')
+    
+    bars2 = ax1.bar(positions[1], fixed_pvlib_mwh, bar_width,
+                   color='darkorange', alpha=0.7, edgecolor='brown', linewidth=1.5,  # Increased linewidth
+                   label='PVLIB Fixed Optimal')
+    
+    bars3 = ax1.bar(positions[2], monthly_opt_osm_mwh, bar_width,
+                   color='limegreen', alpha=0.9, edgecolor='green', linewidth=1.5,  # Increased linewidth
+                   label='OSM-MEPS Monthly Optimal')
+    
+    bars4 = ax1.bar(positions[3], fixed_osm_mwh, bar_width,
+                   color='forestgreen', alpha=0.7, edgecolor='darkgreen', linewidth=1.5,  # Increased linewidth
+                   label='OSM-MEPS Fixed Optimal')
+    
+    ax1.set_xlabel('Month', fontsize=23, fontfamily='Garamond', fontweight='bold')  # Increased font size
+    ax1.set_ylabel('Energy Production (kWh)', fontsize=23, fontfamily='Garamond', fontweight='bold')  # Increased font size
+    ax1.set_xticks(x_pos)
+    ax1.set_xticklabels(month_labels, fontsize=19)  # Increased font size
+    ax1.tick_params(axis='y', labelsize=19)  # Increased font size
+    
+    # Enhanced grid for first plot - like graph paper with multiple grid lines
+    y_max = max(monthly_opt_pvlib_mwh.max(), monthly_opt_osm_mwh.max())
+    y_max_rounded = ((y_max // 50000) + 1.1) * 50000  # Round up to nearest 50 kWh
+    
+    # Major grid lines every 50 kWh (thicker, more prominent)
+    major_y_ticks = np.arange(0, y_max_rounded + 50000, 50000)
+    ax1.set_yticks(major_y_ticks)
+    
+    # Minor grid lines every 10 kWh (lighter, for easier reading)
+    minor_y_ticks = np.arange(0, y_max_rounded + 10000, 10000)
+    ax1.set_ylim(0, y_max_rounded)
+    
+    # Add both major and minor grid lines
+    ax1.grid(True, alpha=0.6, linestyle='-', linewidth=0.8, which='major')  # Major grid - more visible
+    ax1.grid(True, alpha=0.3, linestyle='--', linewidth=0.4, which='minor')  # Minor grid - lighter
+    
+    # Enable minor ticks for the grid
+    ax1.minorticks_on()
+    ax1.set_axisbelow(True)
+    
+    # Legend for energy comparison
+    ax1.legend(loc='upper center', bbox_to_anchor=(0.5, -0.11),
+              ncol=2, fontsize=16.5, framealpha=0.9,  # Increased font size
+              facecolor='white', edgecolor='gray')
+    
+    # Subplot 2: Energy Gains in kWh
+    ax2 = fig.add_subplot(gs[1, 0])
+    ax2.set_facecolor('#fafafa')
+    
+    # Plot energy gains - 2 bars per month in kWh
+    gain_bar_width = total_width / 2
+    gain_positions = [x_pos - gain_bar_width/2, x_pos + gain_bar_width/2]
+    
+    bars_gains_pvlib = ax2.bar(gain_positions[0], differences_pvlib_kwh, gain_bar_width,
+                              color='orange', alpha=0.8, edgecolor='darkorange', linewidth=1.5,  # Increased linewidth
+                              label='PVLIB Energy Gain')
+    bars_gains_osm = ax2.bar(gain_positions[1], differences_osm_kwh, gain_bar_width,
+                            color='limegreen', alpha=0.8, edgecolor='green', linewidth=1.5,  # Increased linewidth
+                            label='OSM-MEPS Energy Gain')
+    
+    ax2.set_xlabel('Month', fontsize=23, fontfamily='Garamond', fontweight='bold')  # Increased font size
+    ax2.set_ylabel('Energy Gain (kWh)', fontsize=23, fontfamily='Garamond', fontweight='bold')  # Increased font size
+    ax2.set_xticks(x_pos)
+    ax2.set_xticklabels(month_labels, fontsize=19)  # Increased font size
+    ax2.tick_params(axis='y', labelsize=19)  # Increased font size
+    
+    # INCREASED GRID SIZE: Enhanced grid for second plot - every 1000 kWh units, NO NEGATIVE VALUES
+    gain_max = max(np.max(differences_pvlib_kwh), np.max(differences_osm_kwh))
+    gain_max_rounded = ((gain_max // 1000) + 1.4) * 1000  # Round up to nearest 1000 kWh
+    gain_ticks = np.arange(0, gain_max_rounded + 1500, 1500)  # Grid every 1000 kWh, starting from 0
+    
+    ax2.set_yticks(gain_ticks)
+    ax2.set_ylim(0, gain_max_rounded)  # Start from 0, no negative values
+    ax2.grid(True, alpha=0.4, linestyle='-', linewidth=0.8)
+    ax2.set_axisbelow(True)
+    
+    # Add value labels on gain bars - FORCE LABELS FOR MARCH AND SEPTEMBER
+    for i, (bar_pvlib, bar_osm) in enumerate(zip(bars_gains_pvlib, bars_gains_osm)):
+        height_pvlib = bar_pvlib.get_height()
+        height_osm = bar_osm.get_height()
+        month_name = month_labels[i]
+        
+        # ALWAYS label PVLib bars for March and September regardless of height
+        if month_name in ['Mar', 'Sep']:
+            y_offset = gain_max_rounded * 0.001
+            ax2.text(bar_pvlib.get_x() + bar_pvlib.get_width()/2., 
+                    height_pvlib + y_offset,
+                    f'{height_pvlib:.0f}', ha='center', va='bottom', fontsize=15,  # Increased font size
+                    fontfamily='Garamond', fontweight='bold')
+        
+        # Label other PVLib bars normally
+        elif height_pvlib > 1:
+            y_offset = gain_max_rounded * 0.001
+            ax2.text(bar_pvlib.get_x() + bar_pvlib.get_width()/2., 
+                    height_pvlib + y_offset,
+                    f'{height_pvlib:.0f}', ha='center', va='bottom', fontsize=15,  # Increased font size
+                    fontfamily='Garamond', fontweight='bold')
+        
+        # Label all OSM-MEPS bars normally
+        if height_osm > 1:
+            y_offset = gain_max_rounded * 0.001
+            ax2.text(bar_osm.get_x() + bar_osm.get_width()/2., 
+                    height_osm + y_offset,
+                    f'{height_osm:.0f}', ha='center', va='bottom', fontsize=15,  # Increased font size
+                    fontfamily='Garamond', fontweight='bold')
+    
+    # Legend for gains
+    ax2.legend(loc='upper center', bbox_to_anchor=(0.5, -0.12),
+              ncol=2, fontsize=16.5, framealpha=0.9,  # Increased font size
+              facecolor='white', edgecolor='gray')
+    
+    # Adjust layout and save
+    plt.subplots_adjust(left=0.08, right=0.95, top=0.95, bottom=0.1)
+    plt.savefig("STATISTICAL_ANALYSIS_COMPARISON_GREECE_final_PETER.pdf", format="pdf", 
+                bbox_inches="tight", dpi=600, facecolor=fig.get_facecolor())
+    plt.show()
+    
+    # Create summary statistics table - mixed units
+    print("\n" + "=" * 60)
+    print("SUMMARY STATISTICS")
+    print("=" * 60)
+    
+    summary_data = {
+        'Metric': ['Total Annual Energy (Monthly Opt)', 'Total Annual Energy (Fixed Opt)', 
+                   'Total Annual Gain', 'Gain Percentage'],
+        'PVLib': [f"{np.sum(monthly_opt_pvlib)/1000:.2f} MWh", f"{np.sum(fixed_pvlib)/1000:.2f} MWh",
+                 f"{np.sum(differences_pvlib):.0f} kWh",
+                 f"{(np.sum(differences_pvlib)/np.sum(fixed_pvlib))*100:.2f}%"],
+        'OSM-MEPS': [f"{np.sum(monthly_opt_osm)/1000:.2f} MWh", f"{np.sum(fixed_osm)/1000:.2f} MWh",
+                    f"{np.sum(differences_osm):.0f} kWh",
+                    f"{(np.sum(differences_osm)/np.sum(fixed_osm))*100:.2f}%"]
+    }
+    
+    summary_df = pd.DataFrame(summary_data)
+    print("\n" + summary_df.to_string(index=False))
+
+# Perform the analysis and create plots greece
+monthly_opt_pvlib, fixed_pvlib, monthly_opt_osm, fixed_osm, differences_pvlib, differences_osm, month_labels = perform_statistical_analysis()
+create_comparative_plots(monthly_opt_pvlib, fixed_pvlib, monthly_opt_osm, fixed_osm, differences_pvlib, differences_osm, month_labels)
+
+#--------------------------------------------------------------------------------------------------------------------------------------------------------
+#--------------------------------------------------------------------------------------------------------------------------------------------------------
